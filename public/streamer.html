@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head><title>Broadcaster</title></head>
+<body>
+  <h2>Broadcaster</h2>
+  <video id="preview" autoplay muted></video>
+  <div>
+    <button id="startBtn">Start Live</button>
+    <button id="stopBtn" disabled>Stop Live</button>
+    <button id="toggleVideo">Toggle Video</button>
+    <button id="toggleAudio">Toggle Audio</button>
+  </div>
+  <p>Share this stream link:</p>
+  <code id="streamUrl"></code>
+
+  <script>
+    const video = document.getElementById("preview");
+    const startBtn = document.getElementById("startBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const toggleVideoBtn = document.getElementById("toggleVideo");
+    const toggleAudioBtn = document.getElementById("toggleAudio");
+    const streamUrl = document.getElementById("streamUrl");
+
+    let mediaRecorder, stream, ws;
+    const streamId = Math.random().toString(36).substr(2, 8);
+
+    streamUrl.textContent = `${location.origin}/viewer.html?streamId=${streamId}`;
+
+    startBtn.onclick = async () => {
+      stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      video.srcObject = stream;
+
+      ws = new WebSocket(`ws://${location.host}/live/${streamId}`);
+      mediaRecorder = new MediaRecorder(stream, {
+        mimeType: "video/webm; codecs=vp8,opus"
+      });
+
+      mediaRecorder.ondataavailable = e => {
+        if (e.data.size > 0 && ws.readyState === 1) {
+          ws.send(e.data);
+        }
+      };
+
+      mediaRecorder.start(1000);
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+    };
+
+    stopBtn.onclick = () => {
+      mediaRecorder.stop();
+      stream.getTracks().forEach(track => track.stop());
+      ws.close();
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+    };
+
+    toggleVideoBtn.onclick = () => {
+      stream.getVideoTracks()[0].enabled = !stream.getVideoTracks()[0].enabled;
+    };
+
+    toggleAudioBtn.onclick = () => {
+      stream.getAudioTracks()[0].enabled = !stream.getAudioTracks()[0].enabled;
+    };
+  </script>
+</body>
+</html>

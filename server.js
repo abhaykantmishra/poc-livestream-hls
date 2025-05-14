@@ -1,0 +1,51 @@
+const express = require('express');
+const WebSocket = require('ws');
+const { spawn } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+
+const app = express();
+const server = require('http').createServer(app);
+const wss = new WebSocket.Server({ noServer: true });
+
+app.use(express.static('public'));
+app.use('/hls', express.static(path.join(__dirname, 'hls')));
+
+if (!fs.existsSync('./hls')) fs.mkdirSync('./hls');
+
+// Handle WebSocket Upgrade
+server.on('upgrade', (req, socket, head) => {
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const streamId = url.pathname.split('/').pop();
+
+  wss.handleUpgrade(req, socket, head, ws => {
+    handleStream(ws, streamId);
+  });
+});
+
+function handleStream(ws, streamId) {
+  const outputDir = `./hls/${streamId}`;
+  if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
+
+  const ffmpeg = spawn('ffmpeg', [
+    '-i', 'pipe:0',
+    '-c:v', 'libx264',
+    '-preset', 'ultrafast',
+    '-tune', 'zerolatency',
+    '-c:a', 'aac',
+    '-f', 'hls',
+    '-hls_time', '1',
+    '-hls_list_size', '5',
+    '-hls_flags', 'independent_segments',
+    `${outputDir}/stream.m3u8`
+  ]);
+
+  ffmpeg.stderr.on('data', d => console.log(`FFmpeg: ${d}`));
+
+  ws.on('message', msg => ffmpeg.stdin.write(msg));
+  ws.on('close', () => ffmpeg.stdin.end());
+}
+
+server.listen(8000, () => {
+  console.log('Server running at http://localhost:8000');
+});

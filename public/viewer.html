@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Viewer</title>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+</head>
+<body>
+  <h2>Live Stream Viewer</h2>
+  <video id="player" controls autoplay width="640" height="360"></video>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const streamId = urlParams.get('streamId');
+
+    if (!streamId) {
+      document.body.innerHTML = '<p>No stream ID provided in URL.</p>';
+    } else {
+      const video = document.getElementById("player");
+      const streamUrl = `/hls/${streamId}/stream.m3u8`;
+
+      if (Hls.isSupported()) {
+        const hls = new Hls({
+          liveSyncDuration: 2,
+          maxLiveSyncPlaybackRate: 1.5,
+          enableWorker: true
+        });
+
+        hls.loadSource(streamUrl);
+        hls.attachMedia(video);
+
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          video.play();
+        });
+
+        hls.on(Hls.Events.LEVEL_LOADED, (_, data) => {
+          if (data.details.live) {
+            const liveEdge = data.details.fragments[data.details.fragments.length - 1].start;
+            video.currentTime = liveEdge;
+          }
+        });
+
+        hls.on(Hls.Events.ERROR, function (event, data) {
+          if (data.fatal) {
+            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+              hls.startLoad(); // try to recover network error
+            } else {
+              hls.destroy();
+              setTimeout(() => location.reload(), 2000); // full reset on other errors
+            }
+          }
+        });
+
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = streamUrl;
+        video.addEventListener('loadedmetadata', () => {
+          video.currentTime = video.duration;
+          video.play();
+        });
+      }
+    }
+  </script>
+</body>
+</html>
