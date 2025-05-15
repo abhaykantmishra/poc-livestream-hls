@@ -45,8 +45,9 @@
           statusEl.textContent = 'Stream is live!';
           if (Hls.isSupported()) {
             const hls = new Hls({
+              liveSyncDuration: 4, // 👈 Keeps you 3s behind "live edge"
+              maxLiveSyncPlaybackRate: 1.0, // prevent fast-forwarding
               liveSyncDuration: 2,
-              maxLiveSyncPlaybackRate: 1.5,
               enableWorker: true
             });
 
