@@ -32,12 +32,17 @@ function handleStream(ws, streamId) {
     '-c:v', 'libx264',
     '-preset', 'ultrafast',
     '-tune', 'zerolatency',
+    '-r', '25',                // Force 25 FPS
+    '-g', '25',                // Keyframe every 25 frames = 1 second
+    '-keyint_min', '25',       // Min interval for keyframes
+    '-sc_threshold', '0',      // Disable scene detection for keyframes
     '-c:a', 'aac',
     '-f', 'hls',
-    '-hls_time', '1',
+    '-hls_time', '2',          // Try to make 1-second segments
     '-hls_list_size', '5',
-    '-hls_flags', 'independent_segments',
-    `${outputDir}/stream.m3u8`
+    '-hls_flags', 'delete_segments+independent_segments',
+    '-hls_segment_filename', `${outputDir}/segment_%03d.ts`,
+    `${outputDir}/stream.m3u8`,
   ]);
 
   ffmpeg.stderr.on('data', d => console.log(`FFmpeg: ${d}`));

@@ -43,11 +43,13 @@
       waitUntilStreamIsReady()
         .then((streamUrl) => {
           statusEl.textContent = 'Stream is live!';
+
           if (Hls.isSupported()) {
             const hls = new Hls({
-              liveSyncDuration: 4, // 👈 Keeps you 3s behind "live edge"
-              maxLiveSyncPlaybackRate: 1.0, // prevent fast-forwarding
-              liveSyncDuration: 2,
+              liveSyncDuration: 2,            // Stay ~2 seconds behind live edge
+              maxBufferLength: 10,            // Max 10s buffer
+              maxBufferSize: 30 * 1000 * 1000,// Max 30MB buffer size
+              maxBufferHole: 0.5,             // Max gap tolerance 0.5s
               enableWorker: true
             });
 
@@ -58,27 +60,22 @@
               video.play();
             });
 
-            hls.on(Hls.Events.LEVEL_LOADED, (_, data) => {
-              if (data.details.live) {
-                const liveEdge = data.details.fragments[data.details.fragments.length - 1].start;
-                video.currentTime = liveEdge;
-              }
-            });
+            // Removed manual currentTime seek on LEVEL_LOADED to avoid jumps
 
-            hls.on(Hls.Events.ERROR, function (event, data) {
+            hls.on(Hls.Events.ERROR, (event, data) => {
               if (data.fatal) {
                 if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-                  hls.startLoad();
+                  hls.startLoad();  // retry network errors
                 } else {
                   hls.destroy();
                   setTimeout(() => location.reload(), 2000);
                 }
               }
             });
+
           } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
             video.src = streamUrl;
             video.addEventListener('loadedmetadata', () => {
-              video.currentTime = video.duration;
               video.play();
             });
           }
